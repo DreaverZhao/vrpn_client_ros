@@ -8,6 +8,8 @@
 
 This fork aims to add velocity and acceleration support to ros2
 
+Added timesync, and change published topic to Odometry, to fit Fastlab ekf code.
+
 ## Usage
 
 ```

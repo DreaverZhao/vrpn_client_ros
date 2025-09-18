@@ -145,68 +145,63 @@ namespace vrpn_client_ros
   void VRPN_CALLBACK VrpnTrackerRos::handle_pose(void *userData, const vrpn_TRACKERCB tracker_pose)
   {
     VrpnTrackerRos *tracker = static_cast<VrpnTrackerRos *>(userData);
+
+    // wmywmy
+    static int count = 0;
+    static double sum_time = 0.0;
+
     rclcpp::Node::SharedPtr nh = tracker->output_nh_;
     
     if (!tracker->pose_pub_)
     {
-      tracker->pose_pub_ = nh->create_publisher<geometry_msgs::msg::PoseStamped>("pose", 1);
+      tracker->pose_pub_ = nh->create_publisher<nav_msgs::msg::Odometry>("pose", 1);
     }
 
-    if (tracker->use_server_time_)
+    if (tracker->pose_pub_->get_subscription_count() > 0)
     {
-      tracker->pose_msg_.header.stamp.sec = tracker_pose.msg_time.tv_sec;
-      tracker->pose_msg_.header.stamp.nanosec = tracker_pose.msg_time.tv_usec * 1000;
+      if (tracker->use_server_time_)
+      {
+        // wmywmy
+        if (count < 600)
+        {
+          tracker->pose_msg_.header.stamp.sec = tracker_pose.msg_time.tv_sec;
+          tracker->pose_msg_.header.stamp.nanosec = tracker_pose.msg_time.tv_usec * 1000;
+          sum_time += 
+            rclcpp::Time(tracker->pose_msg_.header.stamp).seconds()
+            - nh->now().seconds();
+          // std::cout << " | sum_time = " << sum_time << std::endl;
+          count++;
+          return;
+        }  else if (count == 600){
+          sum_time /= (double)count;
+          // std::cout << "Duration = sum_time"  << sum_time << std::endl;
+          count++;
+          return;
+        } else {
+          tracker->pose_msg_.header.stamp.sec = tracker_pose.msg_time.tv_sec;
+          tracker->pose_msg_.header.stamp.nanosec = tracker_pose.msg_time.tv_usec * 1000;
+          double final_time =  rclcpp::Time(tracker->pose_msg_.header.stamp).seconds() - sum_time;
+          tracker->pose_msg_.header.stamp.set__sec((int32_t)final_time);
+          tracker->pose_msg_.header.stamp.set__nanosec((uint32_t)((final_time - (int32_t)final_time) * 1e9));
+          // std::cout << "dt = " << sum_time << std::endl;
+        }
+      }
+      else
+      {
+        tracker->pose_msg_.header.stamp = nh->now();
+      }
+
+      tracker->pose_msg_.pose.pose.position.x = tracker_pose.pos[0] / 1000;
+      tracker->pose_msg_.pose.pose.position.y = tracker_pose.pos[1] / 1000;
+      tracker->pose_msg_.pose.pose.position.z = tracker_pose.pos[2] / 1000;
+      tracker->pose_msg_.pose.pose.orientation.x = tracker_pose.quat[0];
+      tracker->pose_msg_.pose.pose.orientation.y = tracker_pose.quat[1];
+      tracker->pose_msg_.pose.pose.orientation.z = tracker_pose.quat[2];
+      tracker->pose_msg_.pose.pose.orientation.w = tracker_pose.quat[3];
+
+
+      tracker->pose_pub_->publish(tracker->pose_msg_);
     }
-    else
-    {
-      tracker->pose_msg_.header.stamp = nh->now();
-    }
-
-    tracker->pose_msg_.pose.position.x = tracker_pose.pos[0];
-    tracker->pose_msg_.pose.position.y = tracker_pose.pos[1];
-    tracker->pose_msg_.pose.position.z = tracker_pose.pos[2];
-
-    tracker->pose_msg_.pose.orientation.x = tracker_pose.quat[0];
-    tracker->pose_msg_.pose.orientation.y = tracker_pose.quat[1];
-    tracker->pose_msg_.pose.orientation.z = tracker_pose.quat[2];
-    tracker->pose_msg_.pose.orientation.w = tracker_pose.quat[3];
-
-    tracker->pose_pub_->publish(tracker->pose_msg_);
-  
-    // if (tracker->broadcast_tf_)
-    // {
-    //   static tf2_ros::TransformBroadcaster tf_broadcaster;
-
-    //   if (tracker->use_server_time_)
-    //   {
-    //     tracker->transform_stamped_.header.stamp.sec = tracker_pose.msg_time.tv_sec;
-    //     tracker->transform_stamped_.header.stamp.nsec = tracker_pose.msg_time.tv_usec * 1000;
-    //   }
-    //   else
-    //   {
-    //     tracker->transform_stamped_.header.stamp = ros::Time::now();
-    //   }
-
-    //   if (tracker->process_sensor_id_)
-    //   {
-    //     tracker->transform_stamped_.child_frame_id = tracker->tracker_name + "/" + std::to_string(tracker_pose.sensor);
-    //   }
-    //   else
-    //   {
-    //     tracker->transform_stamped_.child_frame_id = tracker->tracker_name;
-    //   }
-
-    //   tracker->transform_stamped_.transform.translation.x = tracker_pose.pos[0];
-    //   tracker->transform_stamped_.transform.translation.y = tracker_pose.pos[1];
-    //   tracker->transform_stamped_.transform.translation.z = tracker_pose.pos[2];
-
-    //   tracker->transform_stamped_.transform.rotation.x = tracker_pose.quat[0];
-    //   tracker->transform_stamped_.transform.rotation.y = tracker_pose.quat[1];
-    //   tracker->transform_stamped_.transform.rotation.z = tracker_pose.quat[2];
-    //   tracker->transform_stamped_.transform.rotation.w = tracker_pose.quat[3];
-
-    //   tf_broadcaster.sendTransform(tracker->transform_stamped_);
-    // }
   }
 
   void VRPN_CALLBACK VrpnTrackerRos::handle_twist(void *userData, const vrpn_TRACKERVELCB tracker_twist)
@@ -219,31 +214,34 @@ namespace vrpn_client_ros
       tracker->twist_pub_ = nh->create_publisher<geometry_msgs::msg::TwistStamped>("twist", 1);
     }
 
-    if (tracker->use_server_time_)
+    if (tracker->twist_pub_->get_subscription_count() > 0)
     {
-      tracker->twist_msg_.header.stamp.sec = tracker_twist.msg_time.tv_sec;
-      tracker->twist_msg_.header.stamp.nanosec = tracker_twist.msg_time.tv_usec * 1000;
+      if (tracker->use_server_time_)
+      {
+        tracker->twist_msg_.header.stamp.sec = tracker_twist.msg_time.tv_sec;
+        tracker->twist_msg_.header.stamp.nanosec = tracker_twist.msg_time.tv_usec * 1000;
+      }
+      else
+      {
+        tracker->twist_msg_.header.stamp = nh->now();
+      }
+
+      tracker->twist_msg_.twist.linear.x = tracker_twist.vel[0] / 1000; // mm/s to m/s
+      tracker->twist_msg_.twist.linear.y = tracker_twist.vel[1] / 1000;
+      tracker->twist_msg_.twist.linear.z = tracker_twist.vel[2] / 1000;
+
+      double roll, pitch, yaw;
+      tf2::Matrix3x3 rot_mat(
+          tf2::Quaternion(tracker_twist.vel_quat[0], tracker_twist.vel_quat[1], tracker_twist.vel_quat[2],
+                          tracker_twist.vel_quat[3]));
+      rot_mat.getRPY(roll, pitch, yaw);
+
+      tracker->twist_msg_.twist.angular.x = roll;
+      tracker->twist_msg_.twist.angular.y = pitch;
+      tracker->twist_msg_.twist.angular.z = yaw;
+
+      tracker->twist_pub_->publish(tracker->twist_msg_);
     }
-    else
-    {
-      tracker->twist_msg_.header.stamp = nh->now();;
-    }
-
-    tracker->twist_msg_.twist.linear.x = tracker_twist.vel[0];
-    tracker->twist_msg_.twist.linear.y = tracker_twist.vel[1];
-    tracker->twist_msg_.twist.linear.z = tracker_twist.vel[2];
-
-    double roll, pitch, yaw;
-    tf2::Matrix3x3 rot_mat(
-        tf2::Quaternion(tracker_twist.vel_quat[0], tracker_twist.vel_quat[1], tracker_twist.vel_quat[2],
-                        tracker_twist.vel_quat[3]));
-    rot_mat.getRPY(roll, pitch, yaw);
-
-    tracker->twist_msg_.twist.angular.x = roll;
-    tracker->twist_msg_.twist.angular.y = pitch;
-    tracker->twist_msg_.twist.angular.z = yaw;
-
-    tracker->twist_pub_->publish(tracker->twist_msg_);
   }
 
   void VRPN_CALLBACK VrpnTrackerRos::handle_accel(void *userData, const vrpn_TRACKERACCCB tracker_accel)
@@ -256,31 +254,34 @@ namespace vrpn_client_ros
       tracker->accel_pub_ = nh->create_publisher<geometry_msgs::msg::AccelStamped>("accel", 1);
     }
 
-    if (tracker->use_server_time_)
+    if (tracker->accel_pub_->get_subscription_count() > 0)
     {
-      tracker->accel_msg_.header.stamp.sec = tracker_accel.msg_time.tv_sec;
-      tracker->accel_msg_.header.stamp.nanosec = tracker_accel.msg_time.tv_usec * 1000;
+      if (tracker->use_server_time_)
+      {
+        tracker->accel_msg_.header.stamp.sec = tracker_accel.msg_time.tv_sec;
+        tracker->accel_msg_.header.stamp.nanosec = tracker_accel.msg_time.tv_usec * 1000;
+      }
+      else
+      {
+        tracker->accel_msg_.header.stamp = nh->now();
+      }
+
+      tracker->accel_msg_.accel.linear.x = tracker_accel.acc[0] / 1000;
+      tracker->accel_msg_.accel.linear.y = tracker_accel.acc[1] / 1000;
+      tracker->accel_msg_.accel.linear.z = tracker_accel.acc[2] / 1000;
+
+      double roll, pitch, yaw;
+      tf2::Matrix3x3 rot_mat(
+          tf2::Quaternion(tracker_accel.acc_quat[0], tracker_accel.acc_quat[1], tracker_accel.acc_quat[2],
+                          tracker_accel.acc_quat[3]));
+      rot_mat.getRPY(roll, pitch, yaw);
+
+      tracker->accel_msg_.accel.angular.x = roll;
+      tracker->accel_msg_.accel.angular.y = pitch;
+      tracker->accel_msg_.accel.angular.z = yaw;
+
+      tracker->accel_pub_->publish(tracker->accel_msg_);
     }
-    else
-    {
-      tracker->accel_msg_.header.stamp = nh->now();;
-    }
-
-    tracker->accel_msg_.accel.linear.x = tracker_accel.acc[0];
-    tracker->accel_msg_.accel.linear.y = tracker_accel.acc[1];
-    tracker->accel_msg_.accel.linear.z = tracker_accel.acc[2];
-
-    double roll, pitch, yaw;
-    tf2::Matrix3x3 rot_mat(
-        tf2::Quaternion(tracker_accel.acc_quat[0], tracker_accel.acc_quat[1], tracker_accel.acc_quat[2],
-                        tracker_accel.acc_quat[3]));
-    rot_mat.getRPY(roll, pitch, yaw);
-
-    tracker->accel_msg_.accel.angular.x = roll;
-    tracker->accel_msg_.accel.angular.y = pitch;
-    tracker->accel_msg_.accel.angular.z = yaw;
-
-    tracker->accel_pub_->publish(tracker->accel_msg_);
   }
 
   VrpnClientRos::VrpnClientRos(rclcpp::Node::SharedPtr nh, rclcpp::Node::SharedPtr private_nh)

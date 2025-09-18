@@ -40,6 +40,7 @@
 #include "geometry_msgs/msg/twist_stamped.hpp"
 #include "geometry_msgs/msg/accel_stamped.hpp"
 #include "geometry_msgs/msg/transform_stamped.hpp"
+#include "nav_msgs/msg/odometry.hpp"
 
 #include <vrpn_Tracker.h>
 #include <vrpn_Connection.h>
@@ -79,7 +80,7 @@ namespace vrpn_client_ros
 
   private:
     TrackerRemotePtr tracker_remote_;
-    rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pose_pub_;
+    rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pose_pub_;
     rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr twist_pub_;
     rclcpp::Publisher<geometry_msgs::msg::AccelStamped>::SharedPtr accel_pub_;
     rclcpp::Node::SharedPtr output_nh_;
@@ -88,10 +89,9 @@ namespace vrpn_client_ros
 
     rclcpp::TimerBase::SharedPtr mainloop_timer;
 
-    geometry_msgs::msg::PoseStamped pose_msg_;
+    nav_msgs::msg::Odometry pose_msg_;
     geometry_msgs::msg::TwistStamped twist_msg_;
     geometry_msgs::msg::AccelStamped accel_msg_;
-    // geometry_msgs::TransformStamped transform_stamped_;
 
     void init(std::string tracker_name, rclcpp::Node::SharedPtr nh, bool create_mainloop_timer);
 
