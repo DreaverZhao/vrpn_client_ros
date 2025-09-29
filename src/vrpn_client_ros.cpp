@@ -166,9 +166,7 @@ namespace vrpn_client_ros
         {
           tracker->pose_msg_.header.stamp.sec = tracker_pose.msg_time.tv_sec;
           tracker->pose_msg_.header.stamp.nanosec = tracker_pose.msg_time.tv_usec * 1000;
-          sum_time += 
-            (rclcpp::Time(tracker->pose_msg_.header.stamp).nanoseconds()
-            - nh->now().nanoseconds()) * 1e-9;
+          sum_time += (rclcpp::Time(tracker->pose_msg_.header.stamp) - nh->get_clock()->now()).seconds();
           // std::cout << " | sum_time = " << sum_time << std::endl;
           count++;
           return;
